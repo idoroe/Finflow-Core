@@ -1,0 +1,13 @@
+CustomerId,Name,Email,Region,JoinDate,AccountType
+CUST001,John Smith,john.smith@email.com,North,2022-01-15,Premium
+CUST002,Jane Doe,jane.doe@email.com,South,2021-05-20,Standard
+CUST003,Mike Johnson,mike.j@email.com,East,2023-02-10,Business
+CUST004,Sarah Williams,sarah.w@email.com,West,2022-07-30,Premium
+CUST005,Tom Brown,tom.brown@email.com,North,2021-11-05,Standard
+CUST006,Lisa Davis,lisa.d@email.com,West,2023-01-25,Business
+CUST007,Robert Miller,robert.m@email.com,South,2022-09-12,Standard
+CUST008,Emily Wilson,emily.w@email.com,East,2023-03-18,Business
+CUST009,David Moore,david.m@email.com,East,2022-06-22,Premium
+CUST010,Jessica Taylor,jessica.t@email.com,West,2023-04-08,Standard
+CUST011,Chris Anderson,chris.a@email.com,South,2021-08-14,Standard
+CUST012,Amanda Thomas,amanda.t@email.com,South,2022-12-03,Premium
