@@ -5,6 +5,35 @@ namespace Finflow.Core.Data;
 
 public class DataLoader
 {
+    private static List<string> ParseCsvLine(string line)
+    {
+        var result = new List<string>();
+        var current = new System.Text.StringBuilder();
+        bool inQuotes = false;
+
+        for (int i = 0; i < line.Length; i++)
+        {
+            char c = line[i];
+
+            if (c == '"')
+            {
+                inQuotes = !inQuotes;
+            }
+            else if (c == ',' && !inQuotes)
+            {
+                result.Add(current.ToString().Trim());
+                current.Clear();
+            }
+            else
+            {
+                current.Append(c);
+            }
+        }
+        result.Add(current.ToString().Trim());
+
+        return result;
+    }
+
     public static List<Transaction> LoadTransactions(string filePath)
     {
         var transactions = new List<Transaction>();
@@ -13,19 +42,28 @@ public class DataLoader
         // Skip header
         for (int i = 1; i < lines.Length; i++)
         {
-            var parts = lines[i].Split(',');
-            if (parts.Length >= 7)
+            try
             {
-                transactions.Add(new Transaction
+                var parts = ParseCsvLine(lines[i]);
+                if (parts.Count >= 7 &&
+                    DateTime.TryParse(parts[2], CultureInfo.InvariantCulture, DateTimeStyles.None, out var transactionDate) &&
+                    decimal.TryParse(parts[3], NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var amount))
                 {
-                    TransactionId = parts[0],
-                    CustomerId = parts[1],
-                    TransactionDate = DateTime.Parse(parts[2]),
-                    Amount = decimal.Parse(parts[3]),
-                    TransactionType = parts[4],
-                    Region = parts[5],
-                    Description = parts[6]
-                });
+                    transactions.Add(new Transaction
+                    {
+                        TransactionId = parts[0],
+                        CustomerId = parts[1],
+                        TransactionDate = transactionDate,
+                        Amount = amount,
+                        TransactionType = parts[4],
+                        Region = parts[5],
+                        Description = parts[6]
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Warning: Failed to parse transaction on line {i + 1}: {ex.Message}");
             }
         }
         
@@ -40,20 +78,31 @@ public class DataLoader
         // Skip header
         for (int i = 1; i < lines.Length; i++)
         {
-            var parts = lines[i].Split(',');
-            if (parts.Length >= 8)
+            try
             {
-                loans.Add(new Loan
+                var parts = ParseCsvLine(lines[i]);
+                if (parts.Count >= 8 &&
+                    decimal.TryParse(parts[2], NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var loanAmount) &&
+                    DateTime.TryParse(parts[3], CultureInfo.InvariantCulture, DateTimeStyles.None, out var loanDate) &&
+                    int.TryParse(parts[6], NumberStyles.Integer, CultureInfo.InvariantCulture, out var termMonths) &&
+                    decimal.TryParse(parts[7], NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var interestRate))
                 {
-                    LoanId = parts[0],
-                    CustomerId = parts[1],
-                    LoanAmount = decimal.Parse(parts[2]),
-                    LoanDate = DateTime.Parse(parts[3]),
-                    Region = parts[4],
-                    Status = parts[5],
-                    TermMonths = int.Parse(parts[6]),
-                    InterestRate = decimal.Parse(parts[7])
-                });
+                    loans.Add(new Loan
+                    {
+                        LoanId = parts[0],
+                        CustomerId = parts[1],
+                        LoanAmount = loanAmount,
+                        LoanDate = loanDate,
+                        Region = parts[4],
+                        Status = parts[5],
+                        TermMonths = termMonths,
+                        InterestRate = interestRate
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Warning: Failed to parse loan on line {i + 1}: {ex.Message}");
             }
         }
         
@@ -68,18 +117,26 @@ public class DataLoader
         // Skip header
         for (int i = 1; i < lines.Length; i++)
         {
-            var parts = lines[i].Split(',');
-            if (parts.Length >= 6)
+            try
             {
-                customers.Add(new Customer
+                var parts = ParseCsvLine(lines[i]);
+                if (parts.Count >= 6 &&
+                    DateTime.TryParse(parts[4], CultureInfo.InvariantCulture, DateTimeStyles.None, out var joinDate))
                 {
-                    CustomerId = parts[0],
-                    Name = parts[1],
-                    Email = parts[2],
-                    Region = parts[3],
-                    JoinDate = DateTime.Parse(parts[4]),
-                    AccountType = parts[5]
-                });
+                    customers.Add(new Customer
+                    {
+                        CustomerId = parts[0],
+                        Name = parts[1],
+                        Email = parts[2],
+                        Region = parts[3],
+                        JoinDate = joinDate,
+                        AccountType = parts[5]
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Warning: Failed to parse customer on line {i + 1}: {ex.Message}");
             }
         }
         
