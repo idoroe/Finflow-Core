@@ -1,0 +1,93 @@
+-- 05_demo_queries.sql
+-- Analytics queries that demonstrate value from the star schema.
+-- These tell a "story" with the data and serve as benchmarks.
+--
+-- HIGH-LEVEL EXPLANATION:
+--   These are the queries an analyst or manager would actually run.
+--   They answer business questions like:
+--     - How much money flows through the system each month?
+--     - Who are the top customers?
+--     - Which regions have the most activity?
+--
+--   Notice how clean these queries are compared to querying raw data —
+--   that's the whole point of building a star schema.
+
+USE DATABASE FINFLOW;
+USE SCHEMA ANALYTICS;
+
+-- Query 1: Monthly transaction volume and total amount
+SELECT
+    d.YEAR,
+    d.MONTH,
+    d.MONTH_NAME,
+    COUNT(*)            AS TRANSACTION_COUNT,
+    SUM(f.AMOUNT)       AS TOTAL_AMOUNT,
+    AVG(f.AMOUNT)       AS AVG_AMOUNT
+FROM FCT_TRANSACTIONS f
+JOIN DIM_DATE d ON f.TRANSACTION_DATE = d.DATE_KEY
+GROUP BY d.YEAR, d.MONTH, d.MONTH_NAME
+ORDER BY d.YEAR, d.MONTH;
+
+-- Query 2: Top 10 accounts by total transaction amount
+SELECT
+    a.ACCOUNT_KEY,
+    a.FREQUENCY,
+    COUNT(*)            AS NUM_TRANSACTIONS,
+    SUM(f.AMOUNT)       AS TOTAL_AMOUNT,
+    AVG(f.BALANCE)      AS AVG_BALANCE
+FROM FCT_TRANSACTIONS f
+JOIN DIM_ACCOUNT a ON f.ACCOUNT_KEY = a.ACCOUNT_KEY
+GROUP BY a.ACCOUNT_KEY, a.FREQUENCY
+ORDER BY TOTAL_AMOUNT DESC
+LIMIT 10;
+
+-- Query 3: Transaction volume by region
+SELECT
+    dist.REGION,
+    COUNT(*)            AS TRANSACTION_COUNT,
+    SUM(f.AMOUNT)       AS TOTAL_AMOUNT,
+    AVG(dist.AVG_SALARY) AS REGION_AVG_SALARY
+FROM FCT_TRANSACTIONS f
+JOIN DIM_ACCOUNT a ON f.ACCOUNT_KEY = a.ACCOUNT_KEY
+JOIN DIM_DISTRICT dist ON a.DISTRICT_ID = dist.DISTRICT_KEY
+GROUP BY dist.REGION
+ORDER BY TOTAL_AMOUNT DESC;
+
+-- Query 4: Transaction type breakdown
+SELECT
+    f.TYPE,
+    f.OPERATION,
+    COUNT(*)            AS TRANSACTION_COUNT,
+    SUM(f.AMOUNT)       AS TOTAL_AMOUNT,
+    AVG(f.AMOUNT)       AS AVG_AMOUNT
+FROM FCT_TRANSACTIONS f
+GROUP BY f.TYPE, f.OPERATION
+ORDER BY TRANSACTION_COUNT DESC;
+
+-- Query 5: Year-over-year growth in transaction count
+SELECT
+    d.YEAR,
+    COUNT(*) AS TRANSACTION_COUNT,
+    LAG(COUNT(*)) OVER (ORDER BY d.YEAR) AS PREV_YEAR_COUNT,
+    ROUND(
+        (COUNT(*) - LAG(COUNT(*)) OVER (ORDER BY d.YEAR))
+        / NULLIF(LAG(COUNT(*)) OVER (ORDER BY d.YEAR), 0) * 100,
+        2
+    ) AS YOY_GROWTH_PCT
+FROM FCT_TRANSACTIONS f
+JOIN DIM_DATE d ON f.TRANSACTION_DATE = d.DATE_KEY
+GROUP BY d.YEAR
+ORDER BY d.YEAR;
+
+-- Query 6: Customer demographics and transaction patterns
+SELECT
+    c.GENDER,
+    COUNT(DISTINCT c.CUSTOMER_KEY)  AS NUM_CUSTOMERS,
+    COUNT(f.TRANSACTION_KEY)        AS TOTAL_TRANSACTIONS,
+    SUM(f.AMOUNT)                   AS TOTAL_AMOUNT,
+    AVG(f.AMOUNT)                   AS AVG_TRANSACTION_AMOUNT
+FROM DIM_CUSTOMER c
+JOIN DIM_ACCOUNT a ON c.DISTRICT_ID = a.DISTRICT_ID
+JOIN FCT_TRANSACTIONS f ON a.ACCOUNT_KEY = f.ACCOUNT_KEY
+GROUP BY c.GENDER
+ORDER BY TOTAL_AMOUNT DESC

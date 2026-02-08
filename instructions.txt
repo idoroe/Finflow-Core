@@ -1,0 +1,177 @@
+FinFlow Core — Project Playbook
+A trimmed, internship-aligned data engineering project (Python + SQL + Snowflake)
+
+Last updated: February 07, 2026
+Time budget: 16 hours/week • Target window: Feb 5 – Apr 30 (12 weeks)
+
+1. What you are building
+FinFlow Core is a mini “Enterprise Data Hub” pipeline. It takes raw banking-style data (messy CSVs, optionally a small API feed), loads it into Snowflake, transforms it into a clean star schema (fact + dimensions), runs automated data-quality checks, and produces demo analytics queries plus documented performance tuning.
+Final outcome
+•	A Snowflake database with two layers: RAW (staging tables) and ANALYTICS (star schema).
+•	A Python runner that executes the full pipeline end-to-end with one command.
+•	SQL scripts for schema creation, transformations, quality checks, and demo queries.
+•	A small test suite + clear logs so failures are easy to debug.
+•	A performance note showing at least one measured improvement (before/after).
+2. Why this prepares you for the RBC role
+Your Enterprise Data Hub internship work emphasizes Python ETL scripts, Snowflake data modeling, optimized SQL, and reliable pipelines. FinFlow Core is deliberately trimmed to focus on those fundamentals, not extra tooling.
+The 5 core skills you will practice
+•	Python ETL automation: extract, validate, load, and run transformations.
+•	Data modeling in Snowflake: choose grain, build fact/dimension tables, enforce keys.
+•	SQL transformation: clean types, standardize values, join and conform data into analytics tables.
+•	Pipeline reliability: idempotent runs, row-count checks, referential integrity checks, logging.
+•	Performance thinking: measure baselines, optimize queries/loads, document results.
+3. Architecture (mental model)
+Think in 4 steps: Ingest → Store RAW → Transform → Validate + Query.
+Raw CSVs (and optional small API JSON)
+            |
+            v
+Snowflake RAW tables  (almost no business logic)
+            |
+            v
+SQL transforms + table builds
+            |
+            v
+Snowflake ANALYTICS tables (star schema: fct_ + dim_)
+            |
+            v
+Quality checks + demo queries + performance notes
+4. Project directory structure
+finflow-core/
+  README.md
+  requirements.txt
+  .env.example
+  .gitignore
+
+  docs/
+    00_overview.md
+    01_data_dictionary.md
+    02_schema_design.md
+    03_pipeline_design.md
+    04_quality_checks.md
+    05_performance.md
+    06_demo_questions.md
+
+  sql/
+    00_setup_snowflake.sql
+    01_create_raw_tables.sql
+    02_create_analytics_tables.sql
+    03_transform_raw_to_analytics.sql
+    04_quality_checks.sql
+    05_demo_queries.sql
+
+  src/
+    run_all.py
+    config.py
+    logging_config.py
+
+    load/
+      snowflake_client.py
+      load_raw.py
+
+    transform/
+      build_analytics.py
+
+    validate/
+      run_quality_checks.py
+
+    perf/
+      run_benchmarks.py
+
+  tests/
+    test_config.py
+    test_csv_reading.py
+    test_snowflake_client.py
+    test_transform_helpers.py
+5. Setup checklist (shortest path to start)
+Install
+•	Python 3.10+
+•	Git
+•	Snowflake account (trial is fine)
+•	VS Code (recommended)
+Configure
+1.	Create the folder structure above.
+2.	Create a virtual environment and install dependencies.
+3.	Create a .env file from .env.example (do not commit it).
+4.	Run sql/00_setup_snowflake.sql to create database, schemas, warehouse.
+
+.env.example (recommended fields)
+SNOWFLAKE_ACCOUNT=xxxx
+SNOWFLAKE_USER=xxxx
+SNOWFLAKE_PASSWORD=xxxx
+SNOWFLAKE_ROLE=ACCOUNTADMIN  # or a scoped role you create
+SNOWFLAKE_WAREHOUSE=FINFLOW_XS
+SNOWFLAKE_DATABASE=FINFLOW
+SNOWFLAKE_SCHEMA_RAW=RAW
+SNOWFLAKE_SCHEMA_ANALYTICS=ANALYTICS
+DATA_DIR=./data
+6. Data + schema design (decisions to make early)
+Choose the grain
+•	Fact table grain: 1 row per transaction (or your dataset’s main event).
+Minimum star schema
+•	fct_transactions (measures: amount, balance, counts, etc.)
+•	dim_customer
+•	dim_account
+•	dim_date
+•	dim_location or dim_district (if available)
+•	Optional: dim_loan, dim_card (only if your dataset supports them)
+Docs you will maintain
+•	docs/01_data_dictionary.md: source tables + column meanings + keys.
+•	docs/02_schema_design.md: business process, grain, dimensions, measures, and tradeoffs.
+•	docs/03_pipeline_design.md: run order, idempotency strategy, and failure modes.
+7. Pipeline run order (how everything fits together)
+Your Python runner should follow the same order every time:
+5.	Connectivity + config sanity checks.
+6.	Create RAW tables (sql/01_create_raw_tables.sql).
+7.	Load RAW tables from CSVs (src/load/load_raw.py).
+8.	Create ANALYTICS tables (sql/02_create_analytics_tables.sql).
+9.	Transform RAW → ANALYTICS (sql/03_transform_raw_to_analytics.sql via src/transform/build_analytics.py).
+10.	Run quality checks (sql/04_quality_checks.sql via src/validate/run_quality_checks.py).
+11.	Run demo queries (sql/05_demo_queries.sql).
+12.	Capture timing metrics (src/perf/run_benchmarks.py).
+Idempotency rule (critical)
+Your pipeline must be safe to run multiple times. The simplest approach is to rebuild ANALYTICS tables each run (truncate + insert) OR use MERGE for upserts. Pick one and document it in docs/03_pipeline_design.md.
+8. Data quality checks (minimum set)
+•	Primary keys are NOT NULL in dimensions.
+•	Primary keys are UNIQUE where expected.
+•	Foreign keys in fct_transactions match existing rows in dimension tables.
+•	Date ranges are valid; key metrics are within reasonable bounds.
+•	Row-count sanity checks between RAW and ANALYTICS are within expected limits.
+Implementation tip
+•	Write checks as SQL queries that return failing rows; treat “0 rows returned” as PASS.
+•	Fail the run if any check returns rows (stop early and log the failure).
+9. Performance (measure → improve → explain)
+Baseline measurements
+•	Total runtime (RAW load + transforms).
+•	Runtime for 3 important analytics queries (your ‘demo queries’).
+One improvement with proof
+•	Optimize at least one slow query or transformation and re-measure.
+•	Optionally add a clustering key (often transaction_date) if it helps pruning for your main queries.
+•	Document before/after in docs/05_performance.md (with timing numbers).
+10. 12-week roadmap (16 hours/week)
+Weeks 1–2: Foundation + RAW loading
+•	Repo + Snowflake setup; data dictionary.
+•	Python loader to populate RAW with logs and row counts.
+Weeks 3–4: Star schema + transformations
+•	Schema design doc + create analytics tables.
+•	SQL transforms from RAW → ANALYTICS; verify joins and outputs.
+Weeks 5–6: Reliability + quality checks + tests
+•	Idempotent pipeline (safe reruns).
+•	Automated quality checks; pytest tests for Python utilities.
+Weeks 7–8: Performance
+•	Benchmark baseline and optimize; write before/after notes.
+Weeks 9–10: Documentation polish
+•	README + docs so someone else can run it.
+•	Refactor code and improve logging clarity.
+Weeks 11–12: Demo pack
+•	Create 6–10 demo queries that tell a coherent story.
+•	Optional: 2–3 simple charts (only if everything else is done).
+11. Definition of Done (final checklist)
+•	One command runs the full pipeline end-to-end successfully.
+•	RAW and ANALYTICS schemas are populated with expected row counts.
+•	Star schema exists and demo queries run correctly.
+•	Quality checks pass and fail loudly when data is intentionally broken.
+•	Performance note includes baseline + at least one improvement with numbers.
+•	Docs are clear enough for a teammate to reproduce the build.
+•	You can explain: grain, star schema, idempotency, and one optimization choice.
+12. Short talk track (use for onboarding/interviews)
+“I built FinFlow Core, a Python + Snowflake warehouse pipeline that loads ~1M banking transactions into RAW tables, transforms them into a star schema for analytics, enforces automated data quality checks (keys + referential integrity), and documents measured SQL performance improvements.”
