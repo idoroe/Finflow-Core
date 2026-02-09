@@ -20,7 +20,7 @@ def test_uppercase_columns():
 def test_strip_whitespace_from_strings():
     """String values should have leading/trailing whitespace removed."""
     df = pd.DataFrame({"name": ["  Alice  ", " Bob", "Charlie "]})
-    df["name"] = df["name"].str.strip()
+    df.loc[:, "name"] = df["name"].str.strip()
     assert list(df["name"]) == ["Alice", "Bob", "Charlie"]
 
 

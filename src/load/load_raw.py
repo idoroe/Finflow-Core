@@ -65,7 +65,7 @@ def load_csv_to_snowflake(client: SnowflakeClient, csv_path: Path, table_name: s
 
     # Convert all values to strings (RAW tables are all VARCHAR)
     for col in df.columns:
-        df[col] = df[col].apply(lambda x: str(x).strip() if x is not None else None)
+        df.loc[:, col] = df[col].apply(lambda x: str(x).strip() if x is not None else None)
 
     # Quote the table name in case it's a reserved word (like ORDER)
     qualified_table = f'FINFLOW.{SCHEMA_RAW}."{table_name}"'

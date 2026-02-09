@@ -41,6 +41,4 @@ DIM_CUSTOMER --- FCT_TRANSACTIONS --- DIM_ACCOUNT
 
 3. **Date dimension**: We generate DIM_DATE from transaction dates only. In production, you'd pre-populate a full calendar (e.g., 2000-2030).
 
----
-
-**TODO**: Update with your final design decisions.
+4. **DIM_DISTRICT from coded columns**: The source district data uses generic column names (A1–A16). We rename them to meaningful names (POPULATION, AVG_SALARY, etc.) during the transform step, so ANALYTICS queries are self-documenting.

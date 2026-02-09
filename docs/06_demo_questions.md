@@ -22,6 +22,4 @@ These are the business questions our analytics queries answer.
 6. **How do customer demographics relate to transaction patterns?**
    → Query 6
 
----
-
-**TODO**: Add more questions as you explore the data. Aim for 6-10 total.
+All 6 queries are implemented in `sql/05_demo_queries.sql` and run automatically via `python -m src.run_all`.

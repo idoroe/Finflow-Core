@@ -18,7 +18,7 @@ The pipeline executes in this exact order every time:
 **Approach: Truncate + Insert**
 
 Every run:
-- RAW tables: `overwrite=True` in `write_pandas()` wipes and reloads
+- RAW tables: `TRUNCATE TABLE` then batch `INSERT` via `executemany()` reloads all rows from CSVs
 - ANALYTICS tables: `TRUNCATE TABLE` then `INSERT INTO` rebuilds from scratch
 
 This means you can safely run the pipeline 100 times and always get the same result.
