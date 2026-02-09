@@ -31,15 +31,11 @@ def test_get_snowflake_config_with_valid_env():
 
 def test_get_snowflake_config_missing_account():
     """Config should raise an error when SNOWFLAKE_ACCOUNT is missing."""
-    env = {
-        "SNOWFLAKE_USER": "test_user",
-        "SNOWFLAKE_PASSWORD": "test_pass",
-    }
-    with patch.dict("os.environ", env, clear=True):
-        # Need to reload the module to pick up the cleared env
-        import importlib
-        import src.config
-        importlib.reload(src.config)
-
+    with patch("src.config.os.getenv", side_effect=lambda key, default=None: {
+        "SNOWFLAKE_USER": None,
+        "SNOWFLAKE_PASSWORD": None,
+        "SNOWFLAKE_ACCOUNT": None,
+    }.get(key, default)):
+        from src.config import get_snowflake_config
         with pytest.raises(EnvironmentError, match="Missing required"):
-            src.config.get_snowflake_config()
+            get_snowflake_config()

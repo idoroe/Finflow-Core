@@ -1,14 +1,5 @@
 -- 04_quality_checks.sql
--- Data quality checks. Each query should return 0 rows if the check PASSES.
--- Any rows returned = a problem that needs investigation.
---
--- HIGH-LEVEL EXPLANATION:
---   These are automated "tests" for your data. Just like unit tests check
---   your code, quality checks verify your data is correct.
---
---   Pattern: SELECT rows WHERE something_is_wrong
---   If result is empty -> PASS
---   If result has rows  -> FAIL (those rows have problems)
+-- Data quality checks. Each query returns 0 rows if PASS, any rows = FAIL.
 
 USE DATABASE FINFLOW;
 USE SCHEMA ANALYTICS;
@@ -52,7 +43,10 @@ FROM FCT_TRANSACTIONS f
 LEFT JOIN DIM_DATE d ON f.TRANSACTION_DATE = d.DATE_KEY
 WHERE d.DATE_KEY IS NULL;
 
--- Check 8: Transaction amounts should be positive
-SELECT 'NEGATIVE AMOUNTS' AS CHECK_NAME, TRANSACTION_KEY, AMOUNT
-FROM FCT_TRANSACTIONS
-WHERE AMOUNT < 0
+-- Check 8: Row count sanity — RAW trans vs ANALYTICS fct_transactions
+SELECT 'ROW COUNT MISMATCH' AS CHECK_NAME,
+    r.RAW_COUNT, a.ANALYTICS_COUNT,
+    r.RAW_COUNT - a.ANALYTICS_COUNT AS DIFFERENCE
+FROM (SELECT COUNT(*) AS RAW_COUNT FROM FINFLOW.RAW.TRANS) r,
+     (SELECT COUNT(*) AS ANALYTICS_COUNT FROM FINFLOW.ANALYTICS.FCT_TRANSACTIONS) a
+WHERE ABS(r.RAW_COUNT - a.ANALYTICS_COUNT) > r.RAW_COUNT * 0.05

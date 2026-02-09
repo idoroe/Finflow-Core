@@ -36,4 +36,5 @@ data/*.json
 # Coverage
 htmlcov/
 .coverage
-.instructions.txt
+instructions.txt
+

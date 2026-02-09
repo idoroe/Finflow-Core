@@ -5,19 +5,11 @@
 --   This is the STAR SCHEMA — the clean, analytics-ready layer.
 --
 --   DIMENSION tables (dim_): describe WHO, WHAT, WHERE, WHEN
---     - dim_customer: who is the customer?
---     - dim_account: what account was involved?
---     - dim_date: when did it happen?
---     - dim_district: where is the customer located?
---
 --   FACT table (fct_): records measurable EVENTS
---     - fct_transactions: each row = one banking transaction with amounts
 --
 --   Notice we now use proper data types (INT, DATE, DECIMAL) instead of VARCHAR.
---   This is because we clean and cast the data during transformation.
---
---   SURROGATE KEYS: We use the original IDs as primary keys here for simplicity.
---   In enterprise settings, you'd often generate new integer surrogate keys.
+--   The district columns A1-A16 are now given meaningful names.
+--   Gender is decoded from the birth_number field.
 
 USE DATABASE FINFLOW;
 USE SCHEMA ANALYTICS;
@@ -33,7 +25,7 @@ CREATE OR REPLACE TABLE DIM_DATE (
     QUARTER         INT
 );
 
--- Dimension: Customer
+-- Dimension: Customer (decoded from client + birth_number)
 CREATE OR REPLACE TABLE DIM_CUSTOMER (
     CUSTOMER_KEY    INT         NOT NULL PRIMARY KEY,
     BIRTH_DATE      DATE,
@@ -49,13 +41,23 @@ CREATE OR REPLACE TABLE DIM_ACCOUNT (
     OPEN_DATE       DATE
 );
 
--- Dimension: District (location/geography)
+-- Dimension: District (A1-A16 columns renamed to meaningful names)
 CREATE OR REPLACE TABLE DIM_DISTRICT (
     DISTRICT_KEY    INT         NOT NULL PRIMARY KEY,
     DISTRICT_NAME   VARCHAR(100),
     REGION          VARCHAR(100),
     POPULATION      INT,
-    AVG_SALARY      DECIMAL(12,2)
+    NUM_MUNICIPALITIES_LT_499   INT,
+    NUM_MUNICIPALITIES_500_1999 INT,
+    NUM_MUNICIPALITIES_2000_9999 INT,
+    NUM_CITIES                  INT,
+    URBAN_RATIO     DECIMAL(5,1),
+    AVG_SALARY      INT,
+    UNEMPLOYMENT_95 DECIMAL(5,2),
+    UNEMPLOYMENT_96 DECIMAL(5,2),
+    NUM_ENTREPRENEURS INT,
+    NUM_CRIMES_95   INT,
+    NUM_CRIMES_96   INT
 );
 
 -- Fact: Transactions (the core event table — GRAIN: one row per transaction)

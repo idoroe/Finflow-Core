@@ -12,6 +12,12 @@ HIGH-LEVEL EXPLANATION:
     The RAW tables are "staging" tables — they hold data exactly as it came from
     the CSV, with minimal changes. We clean and transform it later.
 
+    LOADING STRATEGY:
+    We use batch INSERT statements. For each CSV we:
+      - TRUNCATE the table (wipe old data for idempotency)
+      - INSERT rows in batches of 1000 using executemany()
+    This is reliable across all network configurations.
+
 WHY THIS MATTERS AT RBC:
     Every data pipeline starts by ingesting raw data from somewhere (files, APIs,
     databases). The pattern of "load raw first, transform later" is standard because
@@ -22,56 +28,80 @@ import logging
 import pandas as pd
 from pathlib import Path
 
-from src.config import DATA_DIR, SCHEMA_RAW, get_snowflake_config
+from src.config import DATA_DIR, SCHEMA_RAW
 from src.load.snowflake_client import SnowflakeClient
 
 logger = logging.getLogger("finflow.load_raw")
+
+BATCH_SIZE = 1000
 
 
 def load_csv_to_snowflake(client: SnowflakeClient, csv_path: Path, table_name: str):
     """Load a single CSV file into a Snowflake RAW table.
 
-    Strategy: We use Snowflake's write_pandas utility which internally uses
-    PUT + COPY INTO — Snowflake's fastest bulk-load method.
+    Strategy: TRUNCATE + batch INSERT using executemany().
+    We send rows in chunks of 1000 for efficiency.
 
     Args:
         client: An active SnowflakeClient connection.
         csv_path: Path to the CSV file.
-        table_name: The Snowflake table name to load into (e.g., "TRANSACTIONS").
+        table_name: The Snowflake table name to load into (e.g., "ACCOUNT").
     """
     logger.info("Reading CSV: %s", csv_path.name)
-    df = pd.read_csv(csv_path)
+
+    # Try semicolon separator first (Czech banking dataset uses ";"), fall back to comma
+    df = pd.read_csv(csv_path, sep=";", low_memory=False)
+    if len(df.columns) == 1:
+        df = pd.read_csv(csv_path, sep=",", low_memory=False)
+
     row_count = len(df)
     logger.info("Read %d rows from %s", row_count, csv_path.name)
 
     # Normalize column names to uppercase (Snowflake convention)
     df.columns = [col.strip().upper().replace(" ", "_") for col in df.columns]
 
-    # Use write_pandas for efficient bulk loading
-    from snowflake.connector.pandas_tools import write_pandas
+    # Replace NaN with None (Snowflake expects None for NULL, not pandas NaN)
+    df = df.where(df.notna(), None)
 
-    logger.info("Loading into %s.%s ...", SCHEMA_RAW, table_name)
-    success, num_chunks, num_rows, _ = write_pandas(
-        conn=client.conn,
-        df=df,
-        table_name=table_name,
-        schema=SCHEMA_RAW,
-        auto_create_table=False,  # We create tables explicitly via SQL scripts
-        overwrite=True,           # Truncate + reload for idempotency
-    )
+    # Convert all values to strings (RAW tables are all VARCHAR)
+    for col in df.columns:
+        df[col] = df[col].apply(lambda x: str(x).strip() if x is not None else None)
 
-    if success:
-        logger.info("Loaded %d rows into %s.%s", num_rows, SCHEMA_RAW, table_name)
-    else:
-        logger.error("Failed to load %s into %s.%s", csv_path.name, SCHEMA_RAW, table_name)
-        raise RuntimeError(f"Load failed for {csv_path.name}")
+    # Quote the table name in case it's a reserved word (like ORDER)
+    qualified_table = f'FINFLOW.{SCHEMA_RAW}."{table_name}"'
+
+    # Truncate for idempotency (safe to re-run)
+    logger.info("Truncating %s ...", qualified_table)
+    client.execute(f'TRUNCATE TABLE {qualified_table}')
+
+    # Build INSERT statement with placeholders
+    cols = ", ".join(df.columns)
+    placeholders = ", ".join(["%s"] * len(df.columns))
+    insert_sql = f'INSERT INTO {qualified_table} ({cols}) VALUES ({placeholders})'
+
+    # Insert in batches
+    rows = [tuple(row) for row in df.values]
+    total_loaded = 0
+    cursor = client.conn.cursor()
+
+    try:
+        for i in range(0, len(rows), BATCH_SIZE):
+            batch = rows[i:i + BATCH_SIZE]
+            cursor.executemany(insert_sql, batch)
+            total_loaded += len(batch)
+            if total_loaded % 10000 == 0 or total_loaded == len(rows):
+                logger.info("  %s: %d / %d rows loaded", table_name, total_loaded, len(rows))
+    finally:
+        cursor.close()
+
+    logger.info("Loaded %d rows into %s", total_loaded, qualified_table)
 
 
 def load_all_csvs(client: SnowflakeClient):
     """Find all CSVs in data/ and load each into its corresponding RAW table.
 
     Convention: the CSV filename (without extension) becomes the table name.
-    Example: data/transactions.csv -> RAW.TRANSACTIONS
+    Example: data/account.csv -> RAW.ACCOUNT
     """
     csv_files = sorted(DATA_DIR.glob("*.csv"))
 
@@ -82,7 +112,7 @@ def load_all_csvs(client: SnowflakeClient):
     logger.info("Found %d CSV file(s) to load", len(csv_files))
 
     for csv_path in csv_files:
-        table_name = csv_path.stem.upper()  # "transactions.csv" -> "TRANSACTIONS"
+        table_name = csv_path.stem.upper()
         load_csv_to_snowflake(client, csv_path, table_name)
 
     logger.info("All CSV files loaded into RAW schema.")
